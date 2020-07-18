@@ -1,0 +1,154 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "Vm01Name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "Vm01AdminUserName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "Vm01AdminPassword": {
+      "type": "securestring"
+    },
+    "Vm01WindowsOSVersion": {
+      "type": "string",
+      "defaultValue": "2019-Datacenter",
+      "allowedValues": [
+        "2008-R2-SP1",
+        "2012-Datacenter",
+        "2016-Datacenter",
+        "2012-R2-Datacenter",
+        "2019-Datacenter"
+      ]
+    }
+  },
+  "variables": {
+    "VnetPrefix": "10.0.0.0/16",
+    "Subnet1Name": "Subnet-1",
+    "Subnet1Prefix": "10.0.0.0/24",    
+    "VnetID": "[resourceId('Microsoft.Network/virtualNetworks', 'Vnet01')]",
+    "SubnetRef": "[concat(variables('VnetID'), '/subnets/', variables('Subnet1Name'))]",
+    "Pip01Name": "Pip01",    
+    "ImagePublisher": "MicrosoftWindowsServer",
+    "ImageOffer": "WindowsServer",
+    "OSDiskName": "Vm01OSDisk",
+    "VmSize": "Standard_D2s_v3",    
+    "NicName": "[concat(parameters('Vm01Name'), 'Nic')]"
+  },
+  "resources": [
+    {
+      "name": "Vnet01",
+      "type": "Microsoft.Network/virtualNetworks",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [],
+      "tags": {
+        "displayName": "Vnet01"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('VnetPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('Subnet1Name')]",
+            "properties": {
+              "addressPrefix": "[variables('Subnet1Prefix')]"
+            }
+          }        
+        ]
+      }
+    },
+    {
+      "name": "[variables('NicName')]",
+      "type": "Microsoft.Network/networkInterfaces",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/virtualNetworks', 'Vnet01')]",
+        "[resourceId('Microsoft.Network/publicIPAddresses', variables('Pip01Name'))]"
+      ],
+      "tags": {
+        "displayName": "[variables('NicName')]"
+      },
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "subnet": {
+                "id": "[variables('SubnetRef')]"
+              },
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('Pip01Name'))]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "[variables('Pip01Name')]",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "location": "[resourceGroup().location]",
+      "apiVersion": "2016-03-30",
+      "dependsOn": [],
+      "tags": {
+        "displayName": "Pip01"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "Dynamic"       
+      }
+    },    
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[parameters('Vm01Name')]",
+      "apiVersion": "2017-03-30",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[variables('VmSize')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('ImagePublisher')]",
+            "offer": "[variables('ImageOffer')]",
+            "sku": "[parameters('Vm01WindowsOSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "[variables('OSDiskName')]",
+            "createOption": "FromImage",
+            "managedDisk": {
+              "storageAccountType": "Standard_LRS"
+            },
+            "caching": "ReadWrite"
+          }
+        },
+        "osProfile": {
+          "computerName": "[parameters('Vm01Name')]",
+          "adminUsername": "[parameters('Vm01AdminUsername')]",
+          "windowsConfiguration": {
+            "provisionVMAgent": false
+          },
+          "secrets": [],
+          "adminPassword": "[parameters('Vm01AdminPassword')]"
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('NicName'))]"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "outputs": {}
+}
